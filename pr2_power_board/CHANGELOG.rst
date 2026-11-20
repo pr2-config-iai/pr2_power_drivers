@@ -4,9 +4,15 @@ Changelog for package pr2_power_board
 
 2.0.0 (unreleased)
 ------------------
-* Port to ROS 2 (Jazzy), started: only the service definitions (``PowerBoardCommand``,
-  ``PowerBoardCommand2``) are built so far, for rqt_pr2_dashboard. The power board driver
-  (``power_node2``) is not ported yet.
+* Port to ROS 2 (Jazzy): the service definitions and the power board driver ``power_node2``.
+  ``power_node`` (the old protocol), the simulator and the scripts are not ported.
+* ``power_node2``: same protocol code; same interfaces as ROS 1 (``~/control``, ``~/control2``,
+  ``~/state`` latched, ``/diagnostics``, ``battery/server2``). The board address can be given as
+  ``--address=...`` as before or as the ``address`` parameter; ``sample_frequency`` and
+  ``transition_frequency`` are parameters.
+* Fix: ``boost::mutex::scoped_lock(library_lock_);`` declared an unused lock named
+  ``library_lock_`` instead of locking the mutex, so the receive and publish threads were never
+  synchronized. They now use ``std::lock_guard``.
 
 1.1.10 (2021-05-20)
 -------------------

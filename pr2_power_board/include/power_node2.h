@@ -3,11 +3,15 @@
 
 #include <time.h>
 #include <string>
-#include "ros/ros.h"
-#include "pr2_power_board/PowerBoardCommand.h"
-#include "pr2_power_board/PowerBoardCommand2.h"
-#include "pr2_msgs/BatteryServer2.h"
-#include "boost/thread/mutex.hpp"
+#include <map>
+#include <memory>
+#include <mutex>
+#include "rclcpp/rclcpp.hpp"
+#include "diagnostic_msgs/msg/diagnostic_array.hpp"
+#include "pr2_msgs/msg/battery_server2.hpp"
+#include "pr2_msgs/msg/power_board_state.hpp"
+#include "pr2_power_board/srv/power_board_command.hpp"
+#include "pr2_power_board/srv/power_board_command2.hpp"
 
 class Interface 
 {
@@ -28,7 +32,7 @@ class Interface
 class Device 
 {
   public:
-    ros::Time message_time;
+    rclcpp::Time message_time;
     
     const TransitionMessage &getTransitionMessage()
     {
@@ -55,11 +59,11 @@ class Device
 class PowerBoard
 {
   public:
-    PowerBoard( const ros::NodeHandle node_handle, const std::string &address_str );
-    bool commandCallback( pr2_power_board::PowerBoardCommand::Request &req_,
-                          pr2_power_board::PowerBoardCommand::Response &res_);
-    bool commandCallback2( pr2_power_board::PowerBoardCommand2::Request &req_,
-                          pr2_power_board::PowerBoardCommand2::Response &res_);
+    PowerBoard( const rclcpp::Node::SharedPtr &node, const std::string &address_str );
+    void commandCallback( const std::shared_ptr<pr2_power_board::srv::PowerBoardCommand::Request> req_,
+                          std::shared_ptr<pr2_power_board::srv::PowerBoardCommand::Response> res_);
+    void commandCallback2( const std::shared_ptr<pr2_power_board::srv::PowerBoardCommand2::Request> req_,
+                          std::shared_ptr<pr2_power_board::srv::PowerBoardCommand2::Response> res_);
     void init();
     void collectMessages();
     void sendMessages();
@@ -75,23 +79,21 @@ class PowerBoard
     void checkFanSpeed(); // Check battery temperatures and send command for fan speed
 
   private:
-    ros::NodeHandle node_handle;
-    ros::ServiceServer service;
-    ros::ServiceServer service2;
-    ros::Publisher diags_pub;
-    ros::Publisher state_pub;
-    ros::Subscriber battery_sub_;
+    rclcpp::Node::SharedPtr node_;
+    rclcpp::Service<pr2_power_board::srv::PowerBoardCommand>::SharedPtr service;
+    rclcpp::Service<pr2_power_board::srv::PowerBoardCommand2>::SharedPtr service2;
+    rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diags_pub;
+    rclcpp::Publisher<pr2_msgs::msg::PowerBoardState>::SharedPtr state_pub;
+    rclcpp::Subscription<pr2_msgs::msg::BatteryServer2>::SharedPtr battery_sub_;
 
     std::map<int, float> battery_temps_;
     bool fan_high_;
 
     int getFanDuty(); // Duty cycle to send to fan. 0 if no fan command
   
-    void batteryCB(const pr2_msgs::BatteryServer2::ConstPtr &msgPtr);
+    void batteryCB(const pr2_msgs::msg::BatteryServer2::ConstSharedPtr &msgPtr);
 
-    pr2_power_board::PowerBoardCommand::Request req_;
-    pr2_power_board::PowerBoardCommand::Response res_;
-    boost::mutex library_lock_;
+    std::mutex library_lock_;
     uint64_t ip_address;
 
 };
