@@ -1,33 +1,24 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>pr2_power_board</name>
-  <version>1.1.10</version>
+  <version>2.0.0</version>
   <description>This provides a ROS node for the PR2 Power Board.</description>
   <maintainer email="ros-orphaned-packages@googlegroups.com">ROS Orphaned Package Maintainers</maintainer>
-
-  <license>BSD</license>
-
-  <url type="website">http://www.ros.org/wiki/pr2_power_board</url>
-
   <author>Curt Meyers</author>
   <author>Blaise Gassend</author>
+  <license>BSD</license>
+  <url type="website">http://ros.org/wiki/pr2_power_board</url>
+  <url type="repository">https://github.com/pr2-config-iai/pr2_power_drivers</url>
 
-  <buildtool_depend>catkin</buildtool_depend>
-  <buildtool_depend condition="$ROS_PYTHON_VERSION == 2">python-setuptools</buildtool_depend>
-  <buildtool_depend condition="$ROS_PYTHON_VERSION == 3">python3-setuptools</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
 
-  <build_depend>message_generation</build_depend>
-  <build_depend>roscpp</build_depend>
-  <build_depend>diagnostic_updater</build_depend>
-  <build_depend>diagnostic_msgs</build_depend>
-  <build_depend>pr2_msgs</build_depend>
-  <build_depend>log4cxx</build_depend>
-  <build_depend>libboost-program-options-dev</build_depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
 
-  <exec_depend>message_runtime</exec_depend>
-  <exec_depend>roscpp</exec_depend>
-  <exec_depend>rospy</exec_depend>
-  <exec_depend>diagnostic_updater</exec_depend>
-  <exec_depend>diagnostic_msgs</exec_depend>
-  <exec_depend>pr2_msgs</exec_depend>
-  <exec_depend>log4cxx</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>

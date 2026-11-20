@@ -2,6 +2,12 @@
 Changelog for package pr2_power_board
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.0.0 (unreleased)
+------------------
+* Port to ROS 2 (Jazzy), started: only the service definitions (``PowerBoardCommand``,
+  ``PowerBoardCommand2``) are built so far, for rqt_pr2_dashboard. The power board driver
+  (``power_node2``) is not ported yet.
+
 1.1.10 (2021-05-20)
 -------------------
 * fixes for boost dependencies
