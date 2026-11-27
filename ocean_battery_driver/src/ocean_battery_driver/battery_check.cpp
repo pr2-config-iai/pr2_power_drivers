@@ -39,19 +39,30 @@
 #include <string>
 #include <vector>
 
-#include <boost/bind.hpp>
-#include <boost/program_options.hpp>
-#include <boost/thread/thread.hpp>
-#include <boost/date_time.hpp>
+#include <chrono>
+#include <future>
+#include <memory>
+#include <sstream>
+#include <thread>
 
-#include <ros/rate.h>
-#include <ros/time.h>
+#include <boost/program_options.hpp>
+
+#include "rclcpp/clock.hpp"
+#include "rclcpp/rate.hpp"
+#include "rclcpp/time.hpp"
 
 #include "ocean.h"
 
 namespace po = boost::program_options;
 using namespace std;
 using namespace willowgarage::ocean;
+
+// ROS 1: ros::Time::now() after ros::Time::init(), without a node; ROS 2: an unattached ROS clock.
+static rclcpp::Time now()
+{
+  static rclcpp::Clock clock(RCL_ROS_TIME);
+  return clock.now();
+}
 
 class BatteryServerChecker
 {
@@ -65,13 +76,14 @@ private:
   vector<bool> present;
   vector<bool> inhibited;
   vector<bool> no_good;
-  vector<ros::Time> last_update;
+  vector<rclcpp::Time> last_update;
 
-  boost::shared_ptr<boost::thread> runThread_;
+  std::shared_ptr<std::thread> runThread_;
+  std::promise<void> done_;
 
   void run()
   {
-    ros::Rate my_rate(50);
+    rclcpp::WallRate my_rate(50);
 
     while (!stopRequest)
     {
@@ -81,11 +93,12 @@ private:
         present[i]     = os.server.battery[i].present;
         inhibited[i]   = os.server.battery[i].inhibited;
         no_good[i]     = os.server.battery[i].power_no_good;
-        last_update[i] = os.server.battery[i].last_battery_update;
+        last_update[i] = rclcpp::Time(os.server.battery[i].last_battery_update, RCL_ROS_TIME);
       }
         
       my_rate.sleep();
     }
+    done_.set_value();
   }
 
 public:
@@ -97,20 +110,23 @@ public:
     present.resize(os.server.MAX_BAT_COUNT);
     inhibited.resize(os.server.MAX_BAT_COUNT);
     no_good.resize(os.server.MAX_BAT_COUNT);
-    last_update.resize(os.server.MAX_BAT_COUNT);
+    last_update.resize(os.server.MAX_BAT_COUNT, rclcpp::Time(0, 0, RCL_ROS_TIME));
   }
 
   void start()
   {
-    runThread_ = boost::shared_ptr<boost::thread>(new boost::thread(boost::bind(&BatteryServerChecker::run, this)));
+    runThread_ = std::make_shared<std::thread>(&BatteryServerChecker::run, this);
   }
       
   void stop()
   {
     stopRequest = true;
  
-    boost::posix_time::time_duration timeout = boost::posix_time::seconds(5);
-    runThread_->timed_join(timeout);
+    // ROS 1: timed_join of 5 s (the thread was left running after a timeout).
+    if (done_.get_future().wait_for(std::chrono::seconds(5)) == std::future_status::ready)
+      runThread_->join();
+    else
+      runThread_->detach();
   }
 
   bool batteryOK() const
@@ -121,7 +137,7 @@ public:
     for (int i = 0; i < os.server.MAX_BAT_COUNT; ++i)
     {
       ok = ok && present[i]; 
-      stale = ((ros::Time::now() - last_update[i]).toSec() > timeout_) || stale;
+      stale = ((now() - last_update[i]).seconds() > timeout_) || stale;
     }
 
     return ok && !stale;
@@ -139,8 +155,8 @@ public:
 	ss << "\t\tPresent: " << (present[i] ? "Yes" : "No") << "\n";
 	ss << "\t\tInhibited: " << (inhibited[i] ? "Yes" : "No") << "\n";
 	ss << "\t\tNo Good: " << (no_good[i] ? "Yes" : "No") << "\n";
-        ss << "\t\tHas updated: " << (last_update[i] > ros::Time(1) ? "Yes" : "No") << "\n";
-        ss << "\t\tTime Since Update: " << (ros::Time::now() - last_update[i]).toSec() << "\n";
+        ss << "\t\tHas updated: " << (last_update[i] > rclcpp::Time(1, 0, RCL_ROS_TIME) ? "Yes" : "No") << "\n";
+        ss << "\t\tTime Since Update: " << (now() - last_update[i]).seconds() << "\n";
         ng = ng || no_good[i];
       }
     if (ng)
@@ -203,33 +219,31 @@ int main(int argc, char** argv)
   if (verbose)
     cout << "Running battery check. Waiting for battery drivers to initialize\n";
 
-  ros::Time::init();
-
-  vector<boost::shared_ptr<BatteryServerChecker> > checkers;
+  vector<std::shared_ptr<BatteryServerChecker> > checkers;
   for (uint i = 0; i < ports.size(); ++i)
   {    
-    checkers.push_back(boost::shared_ptr<BatteryServerChecker>(new BatteryServerChecker(i, ports[i], timeout)));
+    checkers.push_back(std::make_shared<BatteryServerChecker>(i, ports[i], timeout));
     checkers[i]->start();                       
   }
 
   if (verbose)
     cout << "Battery monitoring started\n";
 
-  ros::Rate my_rate(2);
-  ros::Time startTime = ros::Time::now();
+  rclcpp::WallRate my_rate(2);
+  rclcpp::Time startTime = now();
 
-  ros::Duration min(min_duration);
-  ros::Duration max(duration);
+  rclcpp::Duration min(min_duration, 0);
+  rclcpp::Duration max(duration, 0);
 
   bool all_ok = false;
   while (true)
   {
     my_rate.sleep();
     
-    if (ros::Time::now() - startTime < min)
+    if (now() - startTime < min)
       continue;
 
-    if (ros::Time::now() - startTime > max)
+    if (now() - startTime > max)
       break;
    
     bool now_ok = true;

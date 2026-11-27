@@ -42,7 +42,13 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include "ros/ros.h"
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <boost/lexical_cast.hpp>
+
+#include "rclcpp/logging.hpp"
 
 using namespace std;
 using namespace power_monitor;
@@ -56,9 +62,9 @@ void PowerStateEstimator::recordObservation(const PowerObservation& obs)
     obs_ = obs;
 }
 
-bool PowerStateEstimator::canEstimate(const ros::Time& t) const
+bool PowerStateEstimator::canEstimate(const rclcpp::Time& t) const
 {
-    return t <= ros::Time::now() && obs_.getBatteries().size() > 0;
+    return t <= clock_.now() && obs_.getBatteries().size() > 0;
 }
 
 // FuelGaugePowerStateEstimator
@@ -66,7 +72,7 @@ bool PowerStateEstimator::canEstimate(const ros::Time& t) const
 string                    FuelGaugePowerStateEstimator::getMethodName() const { return "fuel gauge"; }
 PowerStateEstimator::Type FuelGaugePowerStateEstimator::getMethodType() const { return FuelGauge;    }
 
-PowerStateEstimate FuelGaugePowerStateEstimator::estimate(const ros::Time& t)
+PowerStateEstimate FuelGaugePowerStateEstimator::estimate(const rclcpp::Time& t)
 {
     PowerStateEstimate ps;
     ps.time_remaining    = obs_.getAcCount() > 0 ? obs_.getMaxTimeToFull(t) : obs_.getMinTimeToEmpty(t);
@@ -79,16 +85,13 @@ PowerStateEstimate FuelGaugePowerStateEstimator::estimate(const ros::Time& t)
 
 const std::string AdvancedPowerStateEstimator::DEFAULT_LOG_FILE = "/var/ros/power_monitor/power.log";
 
-AdvancedPowerStateEstimator::AdvancedPowerStateEstimator()
+AdvancedPowerStateEstimator::AdvancedPowerStateEstimator(const string& log_filename)
 {
-    ros::NodeHandle node("~");
-
-    log_filename_ = DEFAULT_LOG_FILE;
-    node.getParam("advanced_log_file", log_filename_);
-    ROS_INFO("Using log file: %s", log_filename_.c_str());
+    log_filename_ = log_filename;
+    RCLCPP_INFO(rclcpp::get_logger("power_monitor"), "Using log file: %s", log_filename_.c_str());
 
     readObservations(log_);
-    ROS_INFO("Read %d observations", (int) log_.size());
+    RCLCPP_INFO(rclcpp::get_logger("power_monitor"), "Read %d observations", (int) log_.size());
 }
 
 string                    AdvancedPowerStateEstimator::getMethodName() const { return "advanced"; }
@@ -103,7 +106,7 @@ void AdvancedPowerStateEstimator::recordObservation(const PowerObservation& obs)
         return;
 
     LogRecord record;
-    record.sec                          = obs.getStamp().sec;
+    record.sec                          = static_cast<uint32_t>(obs.getStamp().seconds());
     record.master_state                 = obs.getMasterState();
     record.charging                     = obs.getAcCount();
     record.total_power                  = obs.getTotalPower();
@@ -122,13 +125,13 @@ void AdvancedPowerStateEstimator::recordObservation(const PowerObservation& obs)
 bool AdvancedPowerStateEstimator::hasEverDischarged() const
 {
     for (vector<LogRecord>::const_iterator i = log_.begin(); i != log_.end(); i++)
-        if ((*i).master_state == pr2_msgs::PowerBoardState::MASTER_SHUTDOWN)
+        if ((*i).master_state == pr2_msgs::msg::PowerBoardState::MASTER_SHUTDOWN)
             return true;
 
     return false;
 }
 
-PowerStateEstimate AdvancedPowerStateEstimator::estimate(const ros::Time& t)
+PowerStateEstimate AdvancedPowerStateEstimator::estimate(const rclcpp::Time& t)
 {
     PowerStateEstimate ps;
 
@@ -140,7 +143,7 @@ PowerStateEstimate AdvancedPowerStateEstimator::estimate(const ros::Time& t)
         float        min_rem_cap = 999999.9;
         for (vector<LogRecord>::const_iterator i = log_.begin(); i != log_.end(); i++)
         {
-            if ((*i).master_state == pr2_msgs::PowerBoardState::MASTER_SHUTDOWN)
+            if ((*i).master_state == pr2_msgs::msg::PowerBoardState::MASTER_SHUTDOWN)
             {
                 min_rsc     = min(min_rsc,     (*i).min_relative_state_of_charge);
                 min_rem_cap = min(min_rem_cap, (*i).total_remaining_capacity);
@@ -153,24 +156,24 @@ PowerStateEstimate AdvancedPowerStateEstimator::estimate(const ros::Time& t)
         float actual_rem_cap = obs_.getTotalRemainingCapacity() - min_rem_cap;
         float rem_hours      = actual_rem_cap / -current;
 
-        ROS_DEBUG("current reported relative state of charge: %d", obs_.getMinRelativeStateOfCharge());
-        ROS_DEBUG("minimum reported remaining capacity: %d", (int) min_rem_cap);
-        ROS_DEBUG("minimum reported relative state of charge: %d", min_rsc);
-        ROS_DEBUG("current: %.2f", current);
-        ROS_DEBUG("report remaining capacity: %f", obs_.getTotalRemainingCapacity());
-        ROS_DEBUG("time remaining: %.2f mins", rem_hours * 60);
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "current reported relative state of charge: %d", obs_.getMinRelativeStateOfCharge());
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "minimum reported remaining capacity: %d", (int) min_rem_cap);
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "minimum reported relative state of charge: %d", min_rsc);
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "current: %.2f", current);
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "report remaining capacity: %f", obs_.getTotalRemainingCapacity());
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "time remaining: %.2f mins", rem_hours * 60);
 
-        ps.time_remaining = ros::Duration(rem_hours * 60 * 60);
+        ps.time_remaining = rclcpp::Duration::from_seconds(rem_hours * 60 * 60);
         ps.relative_capacity = int(100 * (obs_.getMinRelativeStateOfCharge() - min_rsc) / (100.0 - min_rsc));
     }
     else
     {
         // No history. Resort to fuel gauge method
-        ROS_DEBUG("No history (resorting to fuel gauge)");
-        ROS_DEBUG("AC count: %d", obs_.getAcCount());
-        ROS_DEBUG("current reported relative state of charge: %d", obs_.getMinRelativeStateOfCharge());
-        ROS_DEBUG("maximum reported time-to-full: %d", obs_.getMaxTimeToFull(t).sec);
-        ROS_DEBUG("minimum reported time-to-empty: %d", obs_.getMinTimeToEmpty(t).sec);
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "No history (resorting to fuel gauge)");
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "AC count: %d", obs_.getAcCount());
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "current reported relative state of charge: %d", obs_.getMinRelativeStateOfCharge());
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "maximum reported time-to-full: %d", (int) obs_.getMaxTimeToFull(t).seconds());
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "minimum reported time-to-empty: %d", (int) obs_.getMinTimeToEmpty(t).seconds());
 
         ps.time_remaining = obs_.getAcCount() > 0 ? obs_.getMaxTimeToFull(t) : obs_.getMinTimeToEmpty(t);
         ps.relative_capacity = obs_.getMinRelativeStateOfCharge();
@@ -204,7 +207,7 @@ bool AdvancedPowerStateEstimator::readObservations(vector<LogRecord>& log)
     getline(f, line);
     if (!f.good())
     {
-        ROS_ERROR("Error reading header from log file: %s", log_filename_.c_str());
+        RCLCPP_ERROR(rclcpp::get_logger("power_monitor"), "Error reading header from log file: %s", log_filename_.c_str());
         return false;
     }
 
@@ -238,7 +241,7 @@ bool AdvancedPowerStateEstimator::readObservations(vector<LogRecord>& log)
         }
         catch (const boost::bad_lexical_cast& ex) { }
 
-        ROS_DEBUG("Invalid line %d in log file: %s.", line_num, log_filename_.c_str());
+        RCLCPP_DEBUG(rclcpp::get_logger("power_monitor"), "Invalid line %d in log file: %s.", line_num, log_filename_.c_str());
     }
 
     f.close();
@@ -262,7 +265,7 @@ bool AdvancedPowerStateEstimator::saveObservation(const PowerObservation& obs) c
         size_t last_dir_sep = log_filename_.rfind("/");
         if (last_dir_sep == string::npos)
         {
-            ROS_ERROR("Invalid log file: %s", log_filename_.c_str());
+            RCLCPP_ERROR(rclcpp::get_logger("power_monitor"), "Invalid log file: %s", log_filename_.c_str());
             return false;
         }
 
@@ -272,14 +275,14 @@ bool AdvancedPowerStateEstimator::saveObservation(const PowerObservation& obs) c
         if (stat(log_dir.c_str(), &s) != 0)
         {
             // Directory doesn't exist - create
-            ROS_INFO("Creating log file directory: %s", log_dir.c_str());
+            RCLCPP_INFO(rclcpp::get_logger("power_monitor"), "Creating log file directory: %s", log_dir.c_str());
 
             mode_t old_umask = umask(0);
             int res = mkdir(log_dir.c_str(), S_IRWXU | S_IRWXG | S_IRWXO);
             umask(old_umask);
             if (res != 0)      // create directory with permissions: rwxrwxrwx
             {
-                ROS_ERROR("Error creating power monitor log file directory");
+                RCLCPP_ERROR(rclcpp::get_logger("power_monitor"), "Error creating power monitor log file directory");
                 return false;
             }
         }
@@ -291,20 +294,20 @@ bool AdvancedPowerStateEstimator::saveObservation(const PowerObservation& obs) c
     umask(old_umask);
     if (fd == -1)
     {
-        ROS_ERROR("Error opening log file %s: %s", log_filename_.c_str(), strerror(errno));
+        RCLCPP_ERROR(rclcpp::get_logger("power_monitor"), "Error opening log file %s: %s", log_filename_.c_str(), strerror(errno));
         return false;
     }
     f = fdopen(fd, "a");
     if (f == NULL)
     {
-        ROS_ERROR("Error opening log file for appending: %s", log_filename_.c_str());
+        RCLCPP_ERROR(rclcpp::get_logger("power_monitor"), "Error opening log file for appending: %s", log_filename_.c_str());
         return false;
     }
 
     flock(fd, LOCK_SH);
     if (!exists)
         fprintf(f, "secs,master_state,charging,total_power,min_voltage,min_relative_state_of_charge,total_remaining_capacity\n");
-    fprintf(f, "%d,%d,%d,%.3f,%.3f,%d,%.3f\n", obs.getStamp().sec, (int) obs.getMasterState(), obs.getAcCount(), obs.getTotalPower(), obs.getMinVoltage(), obs.getMinRelativeStateOfCharge(), obs.getTotalRemainingCapacity());
+    fprintf(f, "%d,%d,%d,%.3f,%.3f,%d,%.3f\n", static_cast<int>(static_cast<uint32_t>(obs.getStamp().seconds())), (int) obs.getMasterState(), obs.getAcCount(), obs.getTotalPower(), obs.getMinVoltage(), obs.getMinRelativeStateOfCharge(), obs.getTotalRemainingCapacity());
     fclose(f);
     close(fd);
 

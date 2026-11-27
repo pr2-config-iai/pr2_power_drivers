@@ -37,9 +37,12 @@
 
 #include <stdlib.h>
 
-#include "ros/ros.h"
+#include <vector>
 
-#include "pr2_msgs/PowerBoardState.h"
+#include "rclcpp/duration.hpp"
+#include "rclcpp/time.hpp"
+
+#include "pr2_msgs/msg/power_board_state.hpp"
 
 namespace power_monitor {
 
@@ -52,9 +55,9 @@ class PowerObservation
 {
 public:
     PowerObservation();
-    PowerObservation(const ros::Time& stamp, int8_t master_state, const std::vector<BatteryObservation>& batteries);
+    PowerObservation(const rclcpp::Time& stamp, int8_t master_state, const std::vector<BatteryObservation>& batteries);
 
-    const ros::Time&                       getStamp() const;
+    const rclcpp::Time&                    getStamp() const;
     int8_t                                 getMasterState() const;
     const std::vector<BatteryObservation>& getBatteries() const;
 
@@ -63,11 +66,11 @@ public:
     float         getMinVoltage() const;
     unsigned int  getMinRelativeStateOfCharge() const;
     float         getTotalRemainingCapacity() const;
-    ros::Duration getMinTimeToEmpty(const ros::Time& t) const;
-    ros::Duration getMaxTimeToFull(const ros::Time& t) const;
+    rclcpp::Duration getMinTimeToEmpty(const rclcpp::Time& t) const;
+    rclcpp::Duration getMaxTimeToFull(const rclcpp::Time& t) const;
 
 private:
-    ros::Time                       stamp_;
+    rclcpp::Time                    stamp_;
     int8_t                          master_state_;
     std::vector<BatteryObservation> batteries_;
 };
@@ -78,30 +81,30 @@ private:
 class BatteryObservation
 {
 public:
-    BatteryObservation(const ros::Time& stamp, bool ac_present, float voltage, float current,
-                       unsigned int relative_state_of_charge, float remaining_capacity, const ros::Duration& time_to_empty, const ros::Duration& time_to_full);
+    BatteryObservation(const rclcpp::Time& stamp, bool ac_present, float voltage, float current,
+                       unsigned int relative_state_of_charge, float remaining_capacity, const rclcpp::Duration& time_to_empty, const rclcpp::Duration& time_to_full);
 
-    const ros::Time& getStamp() const;
+    const rclcpp::Time& getStamp() const;
 
     bool                 isAcPresent() const;
     float                getVoltage() const;
     float                getCurrent() const;
     unsigned int         getRelativeStateOfCharge() const;
     float                getRemainingCapacity() const;
-    const ros::Duration& getTimeToEmpty() const;
-    const ros::Duration& getTimeToFull() const;
+    const rclcpp::Duration& getTimeToEmpty() const;
+    const rclcpp::Duration& getTimeToFull() const;
 
     float getPower() const;
 
 private:
-    ros::Time     stamp_;
+    rclcpp::Time  stamp_;
     bool          ac_present_;
     float         voltage_;                   // V
     float         current_;                   // A (-ve if discharging)
     unsigned int  relative_state_of_charge_;  // % [0-100]
     float         remaining_capacity_;        // Ah
-    ros::Duration time_to_empty_;
-    ros::Duration time_to_full_;
+    rclcpp::Duration time_to_empty_;
+    rclcpp::Duration time_to_full_;
 };
 
 }

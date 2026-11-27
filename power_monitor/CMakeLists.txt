@@ -1,26 +1,19 @@
-# http://ros.org/doc/groovy/api/catkin/html/user_guide/supposed.html
-cmake_minimum_required(VERSION 3.0.2)
+cmake_minimum_required(VERSION 3.8)
 project(power_monitor)
 
-find_package(catkin REQUIRED COMPONENTS roscpp std_msgs pr2_msgs dynamic_reconfigure)
-find_package(Boost REQUIRED COMPONENTS thread)
+find_package(ament_cmake REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(pr2_msgs REQUIRED)
+find_package(Boost REQUIRED)
 
-include_directories(include ${Boost_INCLUDE_DIRS} ${catkin_INCLUDE_DIRS})
-
-generate_dynamic_reconfigure_options(cfg/PowerMonitor.cfg)
-
-add_executable(power_monitor 
+# ROS 1: dynamic_reconfigure (cfg/PowerMonitor.cfg); ROS 2: the parameter power_state_estimator_.
+add_executable(power_monitor
    src/power_monitor.cpp
    src/power_state_estimator.cpp
    src/observation.cpp)
+target_include_directories(power_monitor PRIVATE include)
+target_link_libraries(power_monitor rclcpp::rclcpp ${pr2_msgs_TARGETS} Boost::boost)
 
-add_dependencies(power_monitor 
-   ${power_monitor_EXPORTED_TARGETS}
-   ${catkin_EXPORTED_TARGETS})
+install(TARGETS power_monitor DESTINATION lib/${PROJECT_NAME})
 
-target_link_libraries(power_monitor ${catkin_LIBRARIES})
-
-install(TARGETS power_monitor
-   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION})
-
-catkin_package()
+ament_package()

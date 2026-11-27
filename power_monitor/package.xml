@@ -1,6 +1,8 @@
-<package>
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
   <name>power_monitor</name>
-  <version>1.1.10</version>
+  <version>2.0.0</version>
   <description>The power_monitor collects messages from the ocean_battery_server and
      the pr2_power_board, and publishes a summary of their data in a
      friendlier message format.</description>
@@ -9,19 +11,18 @@
   <license>BSD</license>
 
   <url type="website">http://www.ros.org/wiki/power_monitor</url>
+  <url type="repository">https://github.com/pr2-config-iai/pr2_power_drivers</url>
 
   <author>Tim Field</author>
   <author>Curt Meyers</author>
 
-  <buildtool_depend>catkin</buildtool_depend>
+  <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <build_depend>roscpp</build_depend>
-  <build_depend>std_msgs</build_depend>
-  <build_depend>pr2_msgs</build_depend>
-  <build_depend>dynamic_reconfigure</build_depend>
-  <run_depend>roscpp</run_depend>
-  <run_depend>std_msgs</run_depend>
-  <run_depend>pr2_msgs</run_depend>
-  <run_depend>dynamic_reconfigure</run_depend>
+  <depend>rclcpp</depend>
+  <depend>pr2_msgs</depend>
+  <depend>boost</depend>
 
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
 </package>

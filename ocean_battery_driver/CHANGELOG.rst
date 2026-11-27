@@ -2,6 +2,17 @@
 Changelog for package ocean_battery_driver
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
+2.0.0 (unreleased)
+------------------
+* Port to ROS 2 (Jazzy): ``ocean_server`` and ``battery_check``, one ament ``CMakeLists.txt``.
+* ``ocean_server``: same serial code, diagnostics (``IBPS N``, ``Smart Battery N.M``) and topics
+  (``battery/server2``, ``battery/server`` with the ROS 2 field names, ``/diagnostics``); same
+  options (``--debug``, ``--count``, ``--dev``) and parameters (``number_of_ports``, ``portN``,
+  ``debug_level``, ``lag_timeout``, ``stale_timeout``). An empty ``portN`` counts as unset. The
+  port threads share the node and its publishers. log4cxx is no longer used.
+* ``battery_check``: same options and output; a ROS clock without a node in place of
+  ``ros::Time::init()``.
+
 1.1.10 (2021-05-20)
 -------------------
 * fixes for boost dependencies

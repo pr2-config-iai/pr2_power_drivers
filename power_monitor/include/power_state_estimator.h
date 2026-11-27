@@ -37,7 +37,13 @@
 
 #include <stdlib.h>
 
-#include "ros/ros.h"
+#include <string>
+#include <vector>
+
+#include "rclcpp/duration.hpp"
+#include "rclcpp/clock.hpp"
+#include "rclcpp/logger.hpp"
+#include "rclcpp/time.hpp"
 
 #include "observation.h"
 
@@ -45,7 +51,7 @@ namespace power_monitor {
 
 struct PowerStateEstimate
 {
-    ros::Duration time_remaining;
+    rclcpp::Duration time_remaining{0, 0};
     unsigned int  relative_capacity;
 };
 
@@ -61,14 +67,17 @@ public:
 
     virtual std::string               getMethodName() const = 0;
     virtual PowerStateEstimator::Type getMethodType() const = 0;
-    virtual PowerStateEstimate        estimate(const ros::Time& t) = 0;
+    virtual PowerStateEstimate        estimate(const rclcpp::Time& t) = 0;
 
     virtual void recordObservation(const PowerObservation& obs);
 
-    virtual bool canEstimate(const ros::Time& t) const;
+    virtual bool canEstimate(const rclcpp::Time& t) const;
 
 protected:
     PowerObservation obs_;
+
+    // ROS 1: ros::Time::now(); ROS 2: a ROS clock (system time without sim time, like the node's).
+    rclcpp::Clock clock_{RCL_ROS_TIME};
 };
 
 /** A simple power state estimator which relies on the values reported by the batteries themselves
@@ -79,7 +88,7 @@ class FuelGaugePowerStateEstimator : public PowerStateEstimator
 public:
     std::string               getMethodName() const;
     PowerStateEstimator::Type getMethodType() const;
-    PowerStateEstimate        estimate(const ros::Time& t);
+    PowerStateEstimate        estimate(const rclcpp::Time& t);
 };
 
 /** A more advanced power state estimator which is informed by the history of the batteries.
@@ -98,17 +107,18 @@ public:
         float        total_remaining_capacity;
     };
 
-    AdvancedPowerStateEstimator();
+    static const std::string DEFAULT_LOG_FILE;
+
+    // ROS 1 read ~advanced_log_file itself; ROS 2: the node passes it (default DEFAULT_LOG_FILE).
+    explicit AdvancedPowerStateEstimator(const std::string& log_filename);
 
     std::string               getMethodName() const;
     PowerStateEstimator::Type getMethodType() const;
-    PowerStateEstimate        estimate(const ros::Time& t);
+    PowerStateEstimate        estimate(const rclcpp::Time& t);
 
     virtual void recordObservation(const PowerObservation& obs);
 
 private:
-    static const std::string DEFAULT_LOG_FILE;
-
     static void tokenize(const std::string& str, std::vector<std::string>& tokens, const std::string& delimiters=",");
 
     bool readObservations(std::vector<LogRecord>& log);

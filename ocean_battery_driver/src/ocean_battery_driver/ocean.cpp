@@ -11,7 +11,8 @@
 #include <limits.h>
 #define FILE_LOGGING 0
 #include "ocean.h"
-#include "ros/time.h"
+#include "rclcpp/time.hpp"
+#include "rclcpp/duration.hpp"
 
 using namespace willowgarage::ocean;
 
@@ -77,7 +78,7 @@ ocean::ocean ( int id,  int debug)
 
   // Mark last update as time "0" for initial values
   for (uint i = 0; i < server.battery.size(); ++i)
-    server.battery[i].last_battery_update = ros::Time(0);
+    server.battery[i].last_battery_update = rclcpp::Time(0, 0, RCL_ROS_TIME);
 }
 
 ocean::~ocean ()
@@ -651,7 +652,7 @@ unsigned int ocean::processSystem (int count, char *field[])
    *  6  ASCII text message
    *
    */
-  server.last_system_update = ros::Time::now();
+  server.last_system_update = clock_.now();
 
   for( int index = 1; index < count; )
   {
@@ -663,7 +664,7 @@ unsigned int ocean::processSystem (int count, char *field[])
       switch(tmp)
       {
         case 1:
-          server.time_left.fromSec((double)convertStringBase16(field[index]) * 60);
+          server.time_left = rclcpp::Duration::from_seconds((double)convertStringBase16(field[index]) * 60);
           report (5, "timeLeft=%d\n", server.time_left.sec);
           break;
         case 3:
@@ -707,7 +708,7 @@ unsigned int ocean::processController (int count, char *field[])
    *
    */
 
-  server.last_controller_update = ros::Time::now();
+  server.last_controller_update = clock_.now();
 
   for( int index = 1; index < count; )
   {
@@ -820,7 +821,7 @@ unsigned int ocean::processBattery (int count, char *field[])
   report (5, "processBattery count=%d \n", count);
   report (5, "currentBattery=%d \n", battery);
 
-  server.battery[battery].last_battery_update = ros::Time::now();
+  server.battery[battery].last_battery_update = clock_.now();
   --count;  //get past sentence type
 
 #if 0
@@ -849,7 +850,7 @@ unsigned int ocean::processBattery (int count, char *field[])
     {
       server.battery[battery].battery_register[regNumber] = value;
       server.battery[battery].battery_update_flag[regNumber] = 1;
-      server.battery[battery].battery_register_update[regNumber] = ros::Time::now();
+      server.battery[battery].battery_register_update[regNumber] = clock_.now();
     }
 
     count -= 2;

@@ -36,16 +36,16 @@
 #define POWER_MONITOR_POWER_MONITOR_H
 
 #include <stdlib.h>
-#include <boost/thread/mutex.hpp>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <string>
 
-#include "ros/ros.h"
-#include "dynamic_reconfigure/server.h"
+#include "rclcpp/rclcpp.hpp"
 
-#include "pr2_msgs/BatteryServer2.h"
-#include "pr2_msgs/PowerBoardState.h"
-#include "pr2_msgs/PowerState.h"
-
-#include "power_monitor/PowerMonitorConfig.h"
+#include "pr2_msgs/msg/battery_server2.hpp"
+#include "pr2_msgs/msg/power_board_state.hpp"
+#include "pr2_msgs/msg/power_state.hpp"
 
 #include "power_state_estimator.h"
 
@@ -56,48 +56,49 @@ namespace power_monitor {
  * estimates of the time remaining until the robot switches off (if discharging) or until the robot is fully
  * charged (if charging).
  */
-class PowerMonitor
+class PowerMonitor : public rclcpp::Node
 {
 public:
     PowerMonitor();
 
     bool setActiveEstimator(PowerStateEstimator::Type estimator_type);
 
-    void batteryServerUpdate(const boost::shared_ptr<const pr2_msgs::BatteryServer2>& battery_server);
-    void powerNodeUpdate(const boost::shared_ptr<const pr2_msgs::PowerBoardState>& power_board_state);
-    void configCallback(power_monitor::PowerMonitorConfig& config, uint32_t level);
+    void batteryServerUpdate(const pr2_msgs::msg::BatteryServer2::ConstSharedPtr& battery_server);
+    void powerNodeUpdate(const pr2_msgs::msg::PowerBoardState::ConstSharedPtr& power_board_state);
+    // ROS 1: dynamic_reconfigure (cfg/PowerMonitor.cfg); ROS 2: the parameter power_state_estimator_.
+    rcl_interfaces::msg::SetParametersResult configCallback(const std::vector<rclcpp::Parameter>& parameters);
 
 private:
     void addEstimator(PowerStateEstimator* estimator);
 
     PowerObservation extractObservation();
 
-    void onPublishTimer(const ros::TimerEvent& e);
+    void onPublishTimer();
 
     void publishPowerState();
 
     std::string masterStateToString(int8_t master_state) const;
 
-    ros::Time getLastBatteryUpdate() const;
+    rclcpp::Time getLastBatteryUpdate() const;
 
 private:
-    dynamic_reconfigure::Server<power_monitor::PowerMonitorConfig> config_server_;
+    rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr config_server_;
 
-    boost::mutex update_mutex_;
-    boost::mutex publish_mutex_;
+    std::mutex update_mutex_;
+    std::mutex publish_mutex_;
 
     int8_t master_state_;
-    std::map<int, boost::shared_ptr<const pr2_msgs::BatteryServer2> > battery_servers_;
+    std::map<int, pr2_msgs::msg::BatteryServer2::ConstSharedPtr> battery_servers_;
 
     std::map<std::string,               PowerStateEstimator::Type>               estimator_types_;
-    std::map<PowerStateEstimator::Type, boost::shared_ptr<PowerStateEstimator> > estimators_;
+    std::map<PowerStateEstimator::Type, std::shared_ptr<PowerStateEstimator> > estimators_;
 
-    boost::shared_ptr<PowerStateEstimator> active_estimator_;
+    std::shared_ptr<PowerStateEstimator> active_estimator_;
 
-    ros::Timer      power_state_pub_timer_;
-    ros::Publisher  power_state_pub_;
-    ros::Subscriber battery_server_sub_;
-    ros::Subscriber power_node_sub_;
+    rclcpp::TimerBase::SharedPtr                                     power_state_pub_timer_;
+    rclcpp::Publisher<pr2_msgs::msg::PowerState>::SharedPtr          power_state_pub_;
+    rclcpp::Subscription<pr2_msgs::msg::BatteryServer2>::SharedPtr   battery_server_sub_;
+    rclcpp::Subscription<pr2_msgs::msg::PowerBoardState>::SharedPtr  power_node_sub_;
 
     PowerObservation observation_;
 

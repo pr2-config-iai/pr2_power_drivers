@@ -8,7 +8,8 @@
 #include <time.h>
 #include <list>
 #include <utility>
-#include "pr2_msgs/BatteryServer2.h"
+#include "pr2_msgs/msg/battery_server2.hpp"
+#include "rclcpp/clock.hpp"
 
 namespace willowgarage
 {
@@ -99,7 +100,11 @@ namespace willowgarage
       static const struct regPair regList[];
       static const unsigned regListLength;
 
-      pr2_msgs::BatteryServer2 server;
+      pr2_msgs::msg::BatteryServer2 server;
+
+    private:
+      // ROS 1: ros::Time::now(); ROS 2: a ROS clock (system time without sim time, like the nodes').
+      rclcpp::Clock clock_{RCL_ROS_TIME};
     };
   }
 }

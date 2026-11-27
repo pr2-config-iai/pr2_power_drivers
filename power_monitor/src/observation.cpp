@@ -38,18 +38,18 @@
 #include <fstream>
 #include <iostream>
 
-#include "ros/ros.h"
+#include <algorithm>
 
 using namespace std;
 using namespace power_monitor;
 
 // PowerObservation
 
-PowerObservation::PowerObservation() { }
+PowerObservation::PowerObservation() : stamp_(0, 0, RCL_ROS_TIME) { }
 
-PowerObservation::PowerObservation(const ros::Time& stamp, int8_t master_state, const vector<BatteryObservation>& batteries) : stamp_(stamp), master_state_(master_state), batteries_(batteries) { }
+PowerObservation::PowerObservation(const rclcpp::Time& stamp, int8_t master_state, const vector<BatteryObservation>& batteries) : stamp_(stamp), master_state_(master_state), batteries_(batteries) { }
 
-const ros::Time&                  PowerObservation::getStamp()       const { return stamp_;        }
+const rclcpp::Time&               PowerObservation::getStamp()       const { return stamp_;        }
 int8_t                            PowerObservation::getMasterState() const { return master_state_; }
 const vector<BatteryObservation>& PowerObservation::getBatteries()   const { return batteries_;    }
 
@@ -108,9 +108,9 @@ float PowerObservation::getTotalRemainingCapacity() const
 /**
   * Returns ros::Duration(-1, 0) if all batteries are charging.
   */
-ros::Duration PowerObservation::getMinTimeToEmpty(const ros::Time& t) const
+rclcpp::Duration PowerObservation::getMinTimeToEmpty(const rclcpp::Time& t) const
 {
-    ros::Duration min_tte(-1, 0);
+    rclcpp::Duration min_tte(-1, 0);
 
     int count = 0;
 
@@ -121,9 +121,9 @@ ros::Duration PowerObservation::getMinTimeToEmpty(const ros::Time& t) const
         if (b.isAcPresent())
             continue;
 
-        ros::Duration staleness = t - b.getStamp();
+        rclcpp::Duration staleness = t - b.getStamp();
 
-        ros::Duration tte(0);
+        rclcpp::Duration tte(0, 0);
         if (staleness < b.getTimeToEmpty())
             tte = b.getTimeToEmpty() - staleness;
 
@@ -141,9 +141,9 @@ ros::Duration PowerObservation::getMinTimeToEmpty(const ros::Time& t) const
 /**
   * Returns ros::Duration(-1, 0) if no batteries are charging.
   */
-ros::Duration PowerObservation::getMaxTimeToFull(const ros::Time& t) const
+rclcpp::Duration PowerObservation::getMaxTimeToFull(const rclcpp::Time& t) const
 {
-    ros::Duration max_ttf(-1, 0);
+    rclcpp::Duration max_ttf(-1, 0);
 
     int count = 0;
 
@@ -154,9 +154,9 @@ ros::Duration PowerObservation::getMaxTimeToFull(const ros::Time& t) const
         if (!b.isAcPresent())
             continue;
 
-        ros::Duration staleness = t - b.getStamp();
+        rclcpp::Duration staleness = t - b.getStamp();
 
-        ros::Duration ttf(0);
+        rclcpp::Duration ttf(0, 0);
         if (staleness < b.getTimeToFull())
             ttf = b.getTimeToFull() - staleness;
 
@@ -173,23 +173,23 @@ ros::Duration PowerObservation::getMaxTimeToFull(const ros::Time& t) const
 
 // BatteryObservation
 
-BatteryObservation::BatteryObservation(const ros::Time& stamp, bool ac_present, float voltage, float current,
+BatteryObservation::BatteryObservation(const rclcpp::Time& stamp, bool ac_present, float voltage, float current,
                                        unsigned int relative_state_of_charge, float remaining_capacity,
-                                       const ros::Duration& time_to_empty, const ros::Duration& time_to_full)
+                                       const rclcpp::Duration& time_to_empty, const rclcpp::Duration& time_to_full)
     : stamp_(stamp), ac_present_(ac_present), voltage_(voltage), current_(current), relative_state_of_charge_(relative_state_of_charge),
       remaining_capacity_(remaining_capacity), time_to_empty_(time_to_empty), time_to_full_(time_to_full)
 {
 }
 
-const ros::Time& BatteryObservation::getStamp() const { return stamp_; }
+const rclcpp::Time& BatteryObservation::getStamp() const { return stamp_; }
 
 bool                 BatteryObservation::isAcPresent()              const { return ac_present_;               }
 float                BatteryObservation::getVoltage()               const { return voltage_;                  }
 float                BatteryObservation::getCurrent()               const { return current_;                  }
 unsigned int         BatteryObservation::getRelativeStateOfCharge() const { return relative_state_of_charge_; }
 float                BatteryObservation::getRemainingCapacity()     const { return remaining_capacity_;       }
-const ros::Duration& BatteryObservation::getTimeToEmpty()           const { return time_to_empty_;            }
-const ros::Duration& BatteryObservation::getTimeToFull()            const { return time_to_full_;             }
+const rclcpp::Duration& BatteryObservation::getTimeToEmpty()        const { return time_to_empty_;            }
+const rclcpp::Duration& BatteryObservation::getTimeToFull()         const { return time_to_full_;             }
 
 float BatteryObservation::getPower() const
 {
